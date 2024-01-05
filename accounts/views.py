@@ -7,6 +7,19 @@ from user_profiles.models import UserProfile
 from django.views.decorators.csrf import ensure_csrf_cookie, csrf_protect
 from django.utils.decorators import method_decorator
 
+class CheckAuthenticatedView(APIView):
+    def get(self, request, format=None):
+        user = self.request.user
+
+        try:
+            isAuthenticated = user.is_authenticated
+
+            if isAuthenticated:
+                return Response({ 'isAuthenticated': 'success' })
+            else:
+                return Response({ 'isAuthenticated': 'error' })
+        except:
+            return Response({ 'error': 'Something went wrong when checking authentication status' })
 
 @method_decorator(csrf_protect, name='dispatch')
 class SignupView(APIView):
@@ -32,7 +45,6 @@ class SignupView(APIView):
                         user = User.objects.get(id=user.id)
 
                         user_profile = UserProfile.objects.create(user=user, first_name='', last_name='', phone='', city='')
-                        user_profile.save()
 
                         return Response({ 'success': 'User created successfully' })
             else:
@@ -40,10 +52,49 @@ class SignupView(APIView):
         except:
                 return Response({ 'error': 'Something went wrong when registering account' })
 
+@method_decorator(csrf_protect, name='dispatch')
+class LoginView(APIView):
+    permission_classes = (permissions.AllowAny, )
 
-method_decorator(ensure_csrf_cookie, name='dispatch')
+    def post(self, request, format=None):
+        data = self.request.data
+
+        username = data['username']
+        password = data['password']
+
+        try:
+            user = auth.authenticate(username=username, password=password)
+
+            if user is not None:
+                auth.login(request, user)
+                return Response({ 'success': 'User authenticated' })
+            else:
+                return Response({ 'error': 'Error Authenticating' })
+        except:
+            return Response({ 'error': 'Something went wrong when logging in' })
+
+class LogoutView(APIView):
+    def post(self, request, format=None):
+        try:
+            auth.logout(request)
+            return Response({ 'success': 'Logout Out' })
+        except:
+            return Response({ 'error': 'Something went wrong when logging out' })
+
+@method_decorator(ensure_csrf_cookie, name='dispatch')
 class GetCSRFToken(APIView):
     permission_classes = (permissions.AllowAny, )
 
     def get(self, request, format=None):
         return Response({ 'success': 'CSRF cookie set' })
+
+class DeleteAccountView(APIView):
+    def delete(self, request, format=None):
+        user = self.request.user
+
+        try:
+            User.objects.filter(id=user.id).delete()
+
+            return Response({ 'success': 'User deleted successfully' })
+        except:
+            return Response({ 'error': 'Something went wrong when trying to delete user' })
